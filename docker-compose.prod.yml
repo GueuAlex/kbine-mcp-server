@@ -40,7 +40,7 @@ services:
     # Port expose en local uniquement
     # Nginx fait le reverse proxy depuis l'exterieur
     ports:
-      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:3002:3002"
 
     # Variables d'environnement
     # Les valeurs sensibles sont dans le fichier .env
