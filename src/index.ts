@@ -200,6 +200,20 @@ app.get("/sse", async (_req: Request, res: Response) => {
  * Le sessionId est passe en query parameter par le client
  * (ex: POST /messages?sessionId=xxx)
  */
+/**
+ * Handler POST /sse pour le fallback mcp-remote
+ *
+ * mcp-remote essaie d'abord le transport Streamable HTTP (POST /sse)
+ * avant de basculer sur SSE-only. On retourne une erreur JSON propre
+ * pour qu'il fasse le fallback correctement.
+ */
+app.post("/sse", (_req: Request, res: Response) => {
+  res.status(405).json({
+    error: "Method not allowed",
+    message: "Ce serveur utilise le transport SSE. Utilisez GET /sse pour la connexion.",
+  });
+});
+
 app.post("/messages", async (req: Request, res: Response) => {
   const timestamp = new Date().toISOString();
 
@@ -232,10 +246,13 @@ app.post("/messages", async (req: Request, res: Response) => {
     await transport.handlePostMessage(req, res);
   } catch (error) {
     console.error(`[${timestamp}] Erreur traitement message pour session ${sessionId}:`, error);
-    res.status(500).json({
-      error: "Internal server error",
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
+    // Ne pas renvoyer d'erreur si la reponse est deja envoyee
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
   }
 });
 
