@@ -26,7 +26,6 @@ import { RowDataPacket } from "mysql2/promise";
 import { executeQuery } from "../database/connection.js";
 import {
   toMarkdownTable,
-  formatPaymentDiagnostic,
   formatCurrency,
   formatDuration,
   formatDate,

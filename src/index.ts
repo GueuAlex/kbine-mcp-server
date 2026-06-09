@@ -129,7 +129,7 @@ const transports = new Map<string, SSEServerTransport>();
  * 4. Le transport SSE maintient la connexion ouverte
  * 5. Les messages sont echanges via SSE
  */
-app.get("/sse", async (req: Request, res: Response) => {
+app.get("/sse", async (_req: Request, res: Response) => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] Nouvelle connexion SSE`);
 

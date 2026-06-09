@@ -18,8 +18,6 @@
 # NOTE: En production, utiliser docker-compose.prod.yml
 # =============================================================================
 
-version: "3.8"
-
 services:
   # ---------------------------------------------------------------------------
   # Service MCP Server
@@ -32,14 +30,8 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3001"
-    environment:
-      - NODE_ENV=development
-      - PORT=3001
-      - DB_HOST=kbine-mcp-mysql
-      - DB_PORT=3306
-      - DB_USER=kbine_readonly
-      - DB_PASSWORD=dev_password_readonly
-      - DB_NAME=kbine_db
+    env_file:
+      - .env.development
     depends_on:
       kbine-mcp-mysql:
         condition: service_healthy
@@ -53,11 +45,8 @@ services:
     image: mysql:8.0
     container_name: kbine-mcp-mysql
     restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: root_dev_password
-      MYSQL_DATABASE: kbine_db
-      MYSQL_USER: kbine_readonly
-      MYSQL_PASSWORD: dev_password_readonly
+    env_file:
+      - .env.development
     volumes:
       # Volume pour persister les donnees
       - kbine-mcp-mysql-data:/var/lib/mysql
@@ -66,7 +55,7 @@ services:
     ports:
       - "3307:3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_dev_password"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -83,7 +72,6 @@ services:
     environment:
       PMA_HOST: kbine-mcp-mysql
       PMA_PORT: 3306
-      MYSQL_ROOT_PASSWORD: root_dev_password
     ports:
       - "8081:80"
     depends_on:

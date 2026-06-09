@@ -62,7 +62,9 @@ export async function rapportMensuel(args: unknown): Promise<string> {
   const { mois } = rapportMensuelSchema.parse(args);
 
   // Extraction de l'annee et du mois
-  const [annee, moisNum] = mois.split("-");
+  const parts = mois.split("-");
+  const annee = parts[0] ?? "";
+  const moisNum = parts[1] ?? "";
 
   // Requete SQL pour le rapport mensuel
   // Cette requete est basee sur celle documentee dans maintenan-KBINE.md

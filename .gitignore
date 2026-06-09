@@ -17,11 +17,13 @@ dist/
 # -----------------------------------------------------------------------------
 # Environnement
 # -----------------------------------------------------------------------------
-# IMPORTANT: Ne jamais commiter le fichier .env avec les credentials
+# IMPORTANT: Ne jamais commiter le fichier .env avec les credentials de production
 .env
 .env.local
-.env.*.local
-.env.example
+.env.production
+
+# .env.development est OK a commiter (credentials de dev local uniquement)
+# .env.example est OK a commiter (template sans secrets)
 
 # -----------------------------------------------------------------------------
 # Logs
@@ -60,6 +62,3 @@ coverage/
 tmp/
 temp/
 *.tmp
-
-
-scripts/*
