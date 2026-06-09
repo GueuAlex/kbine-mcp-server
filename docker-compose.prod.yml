@@ -70,7 +70,7 @@ services:
     # Connexion au reseau Docker existant
     # Ce reseau est cree par le docker-compose du backend kbine-api
     networks:
-      - kbine-network
+      - kbine_kbine-network
 
 # =============================================================================
 # Networks
@@ -78,5 +78,5 @@ services:
 networks:
   # Reseau externe cree par kbine-api
   # Le serveur MCP peut ainsi acceder a kbine-mysql
-  kbine-network:
+  kbine_kbine-network:
     external: true
