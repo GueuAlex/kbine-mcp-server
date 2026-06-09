@@ -1,0 +1,82 @@
+# =============================================================================
+# Docker Compose - Production
+# =============================================================================
+#
+# Ce fichier est utilise pour le deploiement en production.
+# Le serveur MCP se connecte a la base de donnees MySQL existante
+# via le reseau Docker partage avec le backend Kbine.
+#
+# PRE-REQUIS:
+#   - Le reseau "kbine-network" doit exister (cree par kbine-api)
+#   - Le service MySQL "kbine-mysql" doit etre accessible
+#   - L'utilisateur "kbine_readonly" doit etre cree sur MySQL
+#
+# DEPLOIEMENT:
+#   1. Copier ce fichier sur le serveur
+#   2. Creer le fichier .env avec les credentials
+#   3. Builder et demarrer: docker compose -f docker-compose.prod.yml up -d --build
+#
+# MISE A JOUR:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# LOGS:
+#   docker logs kbine-mcp -f
+#
+# =============================================================================
+
+version: "3.8"
+
+services:
+  # ---------------------------------------------------------------------------
+  # Service MCP Server
+  # ---------------------------------------------------------------------------
+  kbine-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kbine-mcp
+    restart: unless-stopped
+
+    # Port expose en local uniquement
+    # Nginx fait le reverse proxy depuis l'exterieur
+    ports:
+      - "127.0.0.1:3001:3001"
+
+    # Variables d'environnement
+    # Les valeurs sensibles sont dans le fichier .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+    env_file:
+      - .env
+
+    # Limites de ressources pour eviter la surcharge
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+    # Logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Connexion au reseau Docker existant
+    # Ce reseau est cree par le docker-compose du backend kbine-api
+    networks:
+      - kbine-network
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  # Reseau externe cree par kbine-api
+  # Le serveur MCP peut ainsi acceder a kbine-mysql
+  kbine-network:
+    external: true

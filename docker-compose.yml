@@ -1,0 +1,106 @@
+# =============================================================================
+# Docker Compose - Developpement Local
+# =============================================================================
+#
+# Ce fichier est utilise pour le developpement local uniquement.
+# Il demarre le serveur MCP avec une base de donnees MySQL locale.
+#
+# UTILISATION:
+#   docker compose up -d        # Demarrer tous les services
+#   docker compose logs -f      # Voir les logs
+#   docker compose down         # Arreter les services
+#
+# ACCES:
+#   - MCP Server: http://localhost:3001
+#   - Health check: http://localhost:3001/health
+#   - phpMyAdmin: http://localhost:8081
+#
+# NOTE: En production, utiliser docker-compose.prod.yml
+# =============================================================================
+
+version: "3.8"
+
+services:
+  # ---------------------------------------------------------------------------
+  # Service MCP Server
+  # ---------------------------------------------------------------------------
+  kbine-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kbine-mcp-dev
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DB_HOST=kbine-mcp-mysql
+      - DB_PORT=3306
+      - DB_USER=kbine_readonly
+      - DB_PASSWORD=dev_password_readonly
+      - DB_NAME=kbine_db
+    depends_on:
+      kbine-mcp-mysql:
+        condition: service_healthy
+    networks:
+      - kbine-mcp-network
+
+  # ---------------------------------------------------------------------------
+  # Service MySQL (pour le developpement local)
+  # ---------------------------------------------------------------------------
+  kbine-mcp-mysql:
+    image: mysql:8.0
+    container_name: kbine-mcp-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_dev_password
+      MYSQL_DATABASE: kbine_db
+      MYSQL_USER: kbine_readonly
+      MYSQL_PASSWORD: dev_password_readonly
+    volumes:
+      # Volume pour persister les donnees
+      - kbine-mcp-mysql-data:/var/lib/mysql
+      # Script d'initialisation pour creer les tables de test
+      - ./scripts/init-dev-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_dev_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kbine-mcp-network
+
+  # ---------------------------------------------------------------------------
+  # phpMyAdmin (pour faciliter le dev)
+  # ---------------------------------------------------------------------------
+  kbine-mcp-phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: kbine-mcp-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: kbine-mcp-mysql
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: root_dev_password
+    ports:
+      - "8081:80"
+    depends_on:
+      kbine-mcp-mysql:
+        condition: service_healthy
+    networks:
+      - kbine-mcp-network
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  kbine-mcp-network:
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  kbine-mcp-mysql-data:
