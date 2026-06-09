@@ -46,7 +46,7 @@ services:
     # Les valeurs sensibles sont dans le fichier .env
     environment:
       - NODE_ENV=production
-      - PORT=3001
+      - PORT=3002
     env_file:
       - .env
 
