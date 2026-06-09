@@ -28,6 +28,7 @@
 
 import "dotenv/config";
 import express, { Request, Response } from "express";
+import cors from "cors";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 
@@ -54,6 +55,14 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 const app = express();
 
 /**
+ * Middleware CORS
+ *
+ * Permet les connexions cross-origin pour Claude Mobile et mcp-remote.
+ * En production, on pourrait restreindre les origines autorisees.
+ */
+app.use(cors());
+
+/**
  * Middleware pour parser le JSON
  *
  * Necessaire pour recevoir les messages MCP via POST /messages
@@ -68,7 +77,7 @@ app.use(express.json());
  */
 app.use((req: Request, _res: Response, next) => {
   const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${req.method} ${req.path}`);
+  console.log(`[${timestamp}] ${req.method} ${req.path}${req.query.sessionId ? `?sessionId=${req.query.sessionId}` : ""}`);
   next();
 });
 
@@ -110,7 +119,7 @@ app.get("/health", async (_req: Request, res: Response) => {
  * Cette map permet de retrouver le transport pour envoyer
  * des messages de reponse.
  *
- * Cle: ID de session (genere aleatoirement)
+ * Cle: ID de session (genere par SSEServerTransport)
  * Valeur: Transport SSE
  */
 const transports = new Map<string, SSEServerTransport>();
@@ -128,27 +137,22 @@ const transports = new Map<string, SSEServerTransport>();
  * 3. Les outils sont enregistres sur le serveur
  * 4. Le transport SSE maintient la connexion ouverte
  * 5. Les messages sont echanges via SSE
+ *
+ * IMPORTANT: Ne pas definir manuellement les headers SSE,
+ * le SSEServerTransport s'en charge automatiquement.
  */
 app.get("/sse", async (_req: Request, res: Response) => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] Nouvelle connexion SSE`);
 
-  // Configurer les headers pour SSE
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-
-  // Permettre les connexions cross-origin (pour Claude Mobile)
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
   // Creer le transport SSE
   // Le chemin /messages est utilise pour les messages entrants
+  // Le transport genere automatiquement un sessionId et l'envoie au client
   const transport = new SSEServerTransport("/messages", res);
 
-  // Generer un ID unique pour cette session
-  const sessionId = Math.random().toString(36).substring(2, 15);
+  // Recuperer le sessionId genere par le transport
+  // Le transport l'envoie dans l'URL du endpoint (ex: /messages?sessionId=xxx)
+  const sessionId = transport.sessionId;
   transports.set(sessionId, transport);
 
   console.log(`[${timestamp}] Session SSE creee: ${sessionId}`);
@@ -175,8 +179,10 @@ app.get("/sse", async (_req: Request, res: Response) => {
     transports.delete(sessionId);
   });
 
-  // Connecter le transport au serveur MCP
+  // Demarrer le transport SSE (envoie l'URL du endpoint au client)
+  // Puis connecter le serveur MCP
   try {
+    await transport.start();
     await server.connect(transport);
     console.log(`[${timestamp}] Serveur MCP connecte pour session ${sessionId}`);
   } catch (error) {
@@ -192,22 +198,32 @@ app.get("/sse", async (_req: Request, res: Response) => {
  * Le transport SSE correspondant est utilise pour traiter le message
  * et envoyer la reponse.
  *
- * Note: Cet endpoint est appele par le transport SSE lui-meme,
- * pas directement par le client.
+ * Le sessionId est passe en query parameter par le client
+ * (ex: POST /messages?sessionId=xxx)
  */
 app.post("/messages", async (req: Request, res: Response) => {
   const timestamp = new Date().toISOString();
 
-  // Recuperer le transport associe (le premier pour simplifier)
-  // En production avec plusieurs clients, il faudrait un systeme
-  // d'identification de session plus robuste
-  const transport = transports.values().next().value as SSEServerTransport | undefined;
+  // Recuperer le sessionId depuis les query params
+  const sessionId = req.query.sessionId as string | undefined;
+
+  if (!sessionId) {
+    console.error(`[${timestamp}] POST /messages sans sessionId`);
+    res.status(400).json({
+      error: "Missing sessionId",
+      message: "Le parametre sessionId est requis",
+    });
+    return;
+  }
+
+  // Recuperer le transport associe a cette session
+  const transport = transports.get(sessionId);
 
   if (!transport) {
-    console.error(`[${timestamp}] Aucun transport SSE actif pour traiter le message`);
-    res.status(503).json({
-      error: "No active SSE connection",
-      message: "Veuillez vous reconnecter via /sse",
+    console.error(`[${timestamp}] Session inconnue: ${sessionId}`);
+    res.status(404).json({
+      error: "Session not found",
+      message: "Session SSE inconnue ou expiree. Veuillez vous reconnecter via /sse",
     });
     return;
   }
@@ -216,7 +232,7 @@ app.post("/messages", async (req: Request, res: Response) => {
     // Le transport gere le message et envoie la reponse via SSE
     await transport.handlePostMessage(req, res);
   } catch (error) {
-    console.error(`[${timestamp}] Erreur traitement message:`, error);
+    console.error(`[${timestamp}] Erreur traitement message pour session ${sessionId}:`, error);
     res.status(500).json({
       error: "Internal server error",
       message: error instanceof Error ? error.message : "Unknown error",
