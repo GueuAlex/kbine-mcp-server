@@ -179,10 +179,9 @@ app.get("/sse", async (_req: Request, res: Response) => {
     transports.delete(sessionId);
   });
 
-  // Demarrer le transport SSE (envoie l'URL du endpoint au client)
-  // Puis connecter le serveur MCP
+  // Connecter le serveur MCP au transport
+  // Note: connect() appelle start() automatiquement sur le transport
   try {
-    await transport.start();
     await server.connect(transport);
     console.log(`[${timestamp}] Serveur MCP connecte pour session ${sessionId}`);
   } catch (error) {
