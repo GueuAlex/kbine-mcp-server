@@ -243,7 +243,8 @@ app.post("/messages", async (req: Request, res: Response) => {
 
   try {
     // Le transport gere le message et envoie la reponse via SSE
-    await transport.handlePostMessage(req, res);
+    // IMPORTANT: Passer req.body car express.json() a deja consomme le stream
+    await transport.handlePostMessage(req, res, req.body);
   } catch (error) {
     console.error(`[${timestamp}] Erreur traitement message pour session ${sessionId}:`, error);
     // Ne pas renvoyer d'erreur si la reponse est deja envoyee
